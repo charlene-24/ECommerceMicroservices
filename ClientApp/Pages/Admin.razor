@@ -1,0 +1,92 @@
+﻿@page "/admin"
+@layout MainLayout
+@using System.Net.Http.Json
+
+<h3 class="mb-4" style="color: #6b2a2a; font-family: 'Caveat', cursive; font-size: 3rem;">Admin Dashboard</h3>
+
+<div class="card shadow-sm border-0 mb-5" style="max-width: 600px;">
+    <div class="card-body p-4">
+        <h5 class="mb-3">Add a New Treat</h5>
+
+        <div class="mb-3">
+            <label class="form-label">Product Name</label>
+            <input type="text" class="form-control" @bind="newProduct.Name" placeholder="e.g. Classic Fudge Brownie">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Category</label>
+            <select class="form-select" @bind="newProduct.Category">
+                <option value="Brownies">Brownies</option>
+                <option value="Crinkles">Crinkles</option>
+                <option value="Cookies">Cookies</option>
+                <option value="Macaroons">Macaroons</option>
+                <option value="Revel Bars">Revel Bars</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-control" @bind="newProduct.Description" placeholder="Short description">
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Price (₱)</label>
+                <input type="number" class="form-control" @bind="newProduct.Price">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Stock Quantity</label>
+                <input type="number" class="form-control" @bind="newProduct.StockQuantity">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Image URL</label>
+            <input type="text" class="form-control" @bind="newProduct.ImageUrl" placeholder="https://...">
+        </div>
+
+        <button class="btn text-white w-100" @onclick="SaveProduct" style="background-color: #c27c7c;">
+            Add Product to Store
+        </button>
+
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            <div class="alert alert-info mt-3">@Message</div>
+        }
+    </div>
+</div>
+
+@code {
+    private ProductModel newProduct = new ProductModel();
+    private string Message = "";
+
+    private async Task SaveProduct()
+    {
+        using var client = new HttpClient();
+
+        // ⚠️ Make sure the port number matches your ProductService!
+        // (If your ProductService opens on 5200, keep this. Otherwise, change it).
+        var response = await client.PostAsJsonAsync("http://localhost:5200/api/products", newProduct);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Message = "Product added successfully!";
+            newProduct = new ProductModel(); // Clear the form
+        }
+        else
+        {
+            Message = "Failed to add product.";
+        }
+    }
+
+    public class ProductModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Category { get; set; } = "Brownies";
+        public string Description { get; set; } = "";
+        public decimal Price { get; set; }
+        public string ImageUrl { get; set; } = "";
+        public int StockQuantity { get; set; } = 10;
+    }
+}

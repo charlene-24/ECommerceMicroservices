@@ -1,0 +1,60 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page @(isSidebarCollapsed ? "sidebar-collapsed" : "")">
+
+    <!-- The Sidebar -->
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <!-- The Main Content Area -->
+    <main>
+        <!-- The Top Bar with the Minimize Button -->
+        <div class="top-row px-3">
+            <button class="btn btn-sm text-white" @onclick="ToggleSidebar" style="background-color: #6b2a2a; border-radius: 5px;">
+                ☰ Menu
+            </button>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    // This variable tracks if the sidebar is hidden or not
+    private bool isSidebarCollapsed = false;
+
+    // This method flips the variable back and forth
+    private void ToggleSidebar()
+    {
+        isSidebarCollapsed = !isSidebarCollapsed;
+    }
+}
+
+<style>
+    /* Make the sidebar pink again (just in case) */
+    .sidebar {
+        background-image: none !important;
+        background-color: #c27c7c !important;
+    }
+
+        .sidebar .nav-item a, .sidebar .navbar-brand {
+            color: #fcfaf8 !important;
+        }
+
+    /* --- THE MINIMIZE LOGIC --- */
+
+    /* This smoothly animates the width */
+    .sidebar {
+        transition: width 0.3s ease;
+        width: 250px; /* Default width */
+    }
+
+    /* When the sidebar is collapsed, shrink it to 0 */
+    .sidebar-collapsed .sidebar {
+        width: 0px;
+        overflow: hidden;
+    }
+</style>

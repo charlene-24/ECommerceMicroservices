@@ -1,0 +1,214 @@
+﻿@page "/"
+@layout BlankLayout
+@using System.Net.Http.Json
+@inject NavigationManager Nav
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<!-- The main container now uses your salmon pink color -->
+<div class="container-fluid d-flex justify-content-center align-items-center vh-100" style="background-color: #c27c7c;">
+
+    <!-- The Cakebox Card -->
+    <div class="card shadow-lg" style="width: 900px; border-radius: 15px; overflow: hidden; border: none;">
+        <div class="row g-0">
+
+            <!-- LEFT SIDE: Login / Register Form -->
+            <div class="col-md-6 p-5 bg-white">
+                <h2 class="text-center mb-4" style="color: #c27c7c; font-family: 'Caveat', cursive; font-size: 3rem;">
+                    @(isRegisterMode ? "REGISTER" : "LOGIN")
+                </h2>
+
+                <div class="text-center mb-4">
+                    <div class="rounded-circle d-inline-flex justify-content-center align-items-center" style="width: 80px; height: 80px; background-color: #c27c7c;">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" style="color: #d1bfae; font-weight: bold;">Name</label>
+                    <input type="text" class="form-control" @bind="Username" placeholder="Enter your name" style="background-color: #fcfaf8;">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label" style="color: #d1bfae; font-weight: bold;">Password</label>
+                    <input type="password" class="form-control" @bind="Password" placeholder="Enter your password" style="background-color: #fcfaf8;">
+                </div>
+
+                <button class="btn w-100 text-white" @onclick="isRegisterMode ? HandleRegister : HandleLogin" style="background-color: #c27c7c;">
+                    @(isRegisterMode ? "Create Account" : "Login")
+                </button>
+
+                @if (!string.IsNullOrEmpty(Message))
+                {
+                    <div class="alert mt-3 @(IsError ? "alert-danger" : "alert-success")" role="alert">
+                        @Message
+                    </div>
+                }
+
+                <div class="d-flex justify-content-between mt-3">
+                    <a href="#" @onclick:preventDefault="true" @onclick="ToggleMode" style="color: #d1bfae; text-decoration: none;">
+                        @(isRegisterMode ? "Back to Login" : "Register")
+                    </a>
+                    <a href="#" style="color: #d1bfae; text-decoration: none;">Forgot?</a>
+                </div>
+            </div>
+
+            <!-- RIGHT SIDE: Cake Image & Ribbons -->
+            <div class="col-md-6 cake-background-section">
+                <div class="cake-background-overlay"></div>
+                <div class="cake-content-layer">
+                    <!-- The Vertical Ribbons -->
+                    <div class="v-bar-1"></div>
+                    <div class="v-bar-2"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Username = "";
+    private string Password = "";
+    private string Message = "";
+    private bool IsError = false;
+    private bool isRegisterMode = false;
+
+    private void ToggleMode()
+    {
+        isRegisterMode = !isRegisterMode;
+        Message = "";
+    }
+
+    private async Task HandleLogin()
+    {
+        Message = "";
+        using var client = new HttpClient();
+        var loginData = new { Name = Username, Password = Password };
+
+        try
+        {
+            var response = await client.PostAsJsonAsync("http://localhost:5081/api/auth/login", loginData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                IsError = false;
+                var userData = await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+                await LocalStorage.SetItemAsync("userName", userData?.name ?? "");
+                await LocalStorage.SetItemAsync("userRole", userData?.role ?? "Customer");
+
+                Nav.NavigateTo("/dashboard");
+            }
+            else
+            {
+                IsError = true;
+                Message = "Invalid username or password.";
+            }
+        }
+        catch
+        {
+            IsError = true;
+            Message = "Could not connect to the server.";
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        Message = "";
+        using var client = new HttpClient();
+        var registerData = new { Name = Username, Password = Password };
+
+        try
+        {
+            var response = await client.PostAsJsonAsync("http://localhost:5081/api/auth/register", registerData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                IsError = false;
+                Message = "Account created! You can now log in.";
+                isRegisterMode = false;
+            }
+            else
+            {
+                IsError = true;
+                Message = "Username already taken.";
+            }
+        }
+        catch
+        {
+            IsError = true;
+            Message = "Could not connect to the server.";
+        }
+    }
+
+    public class LoginResponse
+    {
+        public string name { get; set; } = "";
+        public string role { get; set; } = "";
+    }
+}
+
+<style>
+    /* 1. Force the entire screen to be salmon pink */
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        background-color: #c27c7c !important;
+    }
+
+    /* 2. Cake Background Styles */
+    .cake-background-section {
+        background-image: url('/cake.jpg');
+        background-size: cover;
+        background-position: center;
+        position: relative;
+        min-height: 100%;
+    }
+
+    .cake-background-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(252, 250, 248, 0.4);
+        z-index: 1;
+    }
+
+    .cake-content-layer {
+        position: relative;
+        z-index: 2;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* 3. Ribbons */
+    .v-bar-1 {
+        position: absolute;
+        right: 70px;
+        top: 0;
+        bottom: 0;
+        width: 20px;
+        background-color: #c27c7c;
+        z-index: 3;
+    }
+
+    .v-bar-2 {
+        position: absolute;
+        right: 30px;
+        top: 0;
+        bottom: 0;
+        width: 20px;
+        background-color: #c27c7c;
+        z-index: 3;
+    }
+
+    /* Font */
+    @@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&display=swap');
+</style>
