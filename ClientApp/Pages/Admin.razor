@@ -1,57 +1,182 @@
 ﻿@page "/admin"
 @layout MainLayout
 @using System.Net.Http.Json
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject IJSRuntime JSRuntime
 
 <h3 class="mb-4" style="color: #6b2a2a; font-family: 'Caveat', cursive; font-size: 3rem;">Admin Dashboard</h3>
 
-<div class="card shadow-sm border-0 mb-5" style="max-width: 600px;">
+<div class="row">
+    <!-- Left Side: Add Product -->
+    <div class="col-md-5">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h5 class="mb-3">Add a New Treat</h5>
+
+                <div class="mb-3">
+                    <label class="form-label">Product Name</label>
+                    <input type="text" class="form-control" @bind="newProduct.Name" placeholder="e.g. Classic Fudge Brownie">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Category</label>
+                    <select class="form-select" @bind="newProduct.Category">
+                        @foreach (var cat in categories)
+                        {
+                            <option value="@cat">@cat</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <input type="text" class="form-control" @bind="newProduct.Description" placeholder="Short description">
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Price (₱)</label>
+                        <input type="number" class="form-control" @bind="newProduct.Price">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Stock Quantity</label>
+                        <input type="number" class="form-control" @bind="newProduct.StockQuantity">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Image URL</label>
+                    <input type="text" class="form-control" @bind="newProduct.ImageUrl" placeholder="https://...">
+                </div>
+
+                <button class="btn text-white w-100" @onclick="SaveProduct" style="background-color: #c27c7c;">
+                    Add Product to Store
+                </button>
+
+                @if (!string.IsNullOrEmpty(Message))
+                {
+                    <div class="alert alert-info mt-3 py-2">@Message</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Side: Manage Categories -->
+    <div class="col-md-7">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4" style="background-color: #fcfaf8;">
+                <h5 class="mb-3">Manage Categories</h5>
+
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" @bind="newCategoryName" placeholder="New Category Name">
+                    <button class="btn text-white" @onclick="AddCategory" style="background-color: #c27c7c;">Add</button>
+                </div>
+
+                <ul class="list-group">
+                    @foreach (var cat in categories)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            @if (editingCategory == cat)
+                            {
+                                <input type="text" class="form-control form-control-sm me-2" @bind="editCategoryName" />
+                                <div>
+                                    <button class="btn btn-sm btn-success me-1" @onclick="SaveEditCategory">Save</button>
+                                    <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">Cancel</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <span>@cat</span>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartEditCategory(cat)">Edit</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveCategory(cat)">Remove</button>
+                                </div>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Existing Products Table -->
+<div class="card shadow-sm border-0 mt-2" style="min-height: 500px;">
     <div class="card-body p-4">
-        <h5 class="mb-3">Add a New Treat</h5>
+        <h5 class="mb-3">Manage Existing Products</h5>
 
-        <div class="mb-3">
-            <label class="form-label">Product Name</label>
-            <input type="text" class="form-control" @bind="newProduct.Name" placeholder="e.g. Classic Fudge Brownie">
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Category</label>
-            <select class="form-select" @bind="newProduct.Category">
-                <option value="Brownies">Brownies</option>
-                <option value="Crinkles">Crinkles</option>
-                <option value="Cookies">Cookies</option>
-                <option value="Macaroons">Macaroons</option>
-                <option value="Revel Bars">Revel Bars</option>
-            </select>
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Description</label>
-            <input type="text" class="form-control" @bind="newProduct.Description" placeholder="Short description">
-        </div>
-
-        <div class="row">
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Price (₱)</label>
-                <input type="number" class="form-control" @bind="newProduct.Price">
+        <!-- Search and Sort Controls -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <input type="text" class="form-control" @bind="searchString" @bind:event="oninput" placeholder="Search by product name..." />
             </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label">Stock Quantity</label>
-                <input type="number" class="form-control" @bind="newProduct.StockQuantity">
+            <div class="col-md-6">
+                <select class="form-select" @bind="sortOrder">
+                    <option value="name_asc">Sort by Name (A-Z)</option>
+                    <option value="name_desc">Sort by Name (Z-A)</option>
+                    <option value="price_asc">Sort by Price (Low to High)</option>
+                    <option value="price_desc">Sort by Price (High to Low)</option>
+                    <option value="stock_asc">Sort by Stock (Low to High)</option>
+                    <option value="stock_desc">Sort by Stock (High to Low)</option>
+                </select>
             </div>
         </div>
 
-        <div class="mb-3">
-            <label class="form-label">Image URL</label>
-            <input type="text" class="form-control" @bind="newProduct.ImageUrl" placeholder="https://...">
-        </div>
-
-        <button class="btn text-white w-100" @onclick="SaveProduct" style="background-color: #c27c7c;">
-            Add Product to Store
-        </button>
-
-        @if (!string.IsNullOrEmpty(Message))
+        @if (allProducts == null)
         {
-            <div class="alert alert-info mt-3">@Message</div>
+            <p>Loading products...</p>
+        }
+        else
+        {
+            <table class="table align-middle" style="table-layout: fixed; width: 100%;">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Price (₱)</th>
+                        <th>Stock</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in DisplayedProducts)
+                    {
+                        <tr>
+                            @if (editingProductId == p.Id)
+                            {
+                                <!-- EDIT MODE -->
+                                <td><input type="text" class="form-control form-control-sm" @bind="editProduct.Name" /></td>
+                                <td>
+                                    <select class="form-select form-select-sm" @bind="editProduct.Category">
+                                        @foreach (var cat in categories)
+                                        {
+                                            <option value="@cat">@cat</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td><input type="number" class="form-control form-control-sm" @bind="editProduct.Price" /></td>
+                                <td><input type="number" class="form-control form-control-sm" @bind="editProduct.StockQuantity" /></td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-success me-1" @onclick="SaveProductEdit">Save</button>
+                                    <button class="btn btn-sm btn-secondary" @onclick="CancelProductEdit">Cancel</button>
+                                </td>
+                            }
+                            else
+                            {
+                                <!-- VIEW MODE -->
+                                <td>@p.Name</td>
+                                <td>@p.Category</td>
+                                <td>@p.Price.ToString("0.00")</td>
+                                <td>@p.StockQuantity</td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => StartProductEdit(p)">Edit</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteProduct(p.Id)">Delete</button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
         }
     </div>
 </div>
@@ -60,18 +185,68 @@
     private ProductModel newProduct = new ProductModel();
     private string Message = "";
 
+    // Category Management
+    private List<string> categories = new List<string> { "Brownies", "Crinkles", "Cookies", "Macaroons", "Revel Bars" };
+    private string newCategoryName = "";
+    private string? editingCategory = null;
+    private string editCategoryName = "";
+
+    // Product Management
+    private List<ProductModel>? allProducts;
+    private int? editingProductId = null;
+    private ProductModel editProduct = new ProductModel();
+
+    // Search & Sort
+    private string searchString = "";
+    private string sortOrder = "name_asc";
+
+    // This computed property handles the searching and sorting dynamically!
+    private IEnumerable<ProductModel> DisplayedProducts
+    {
+        get
+        {
+            if (allProducts == null) return new List<ProductModel>();
+
+            // 1. Filter by search string
+            var result = allProducts.Where(p => string.IsNullOrEmpty(searchString) ||
+                                                p.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            // 2. Sort based on dropdown
+            result = sortOrder switch
+            {
+                "name_asc" => result.OrderBy(p => p.Name).ToList(),
+                "name_desc" => result.OrderByDescending(p => p.Name).ToList(),
+                "price_asc" => result.OrderBy(p => p.Price).ToList(),
+                "price_desc" => result.OrderByDescending(p => p.Price).ToList(),
+                "stock_asc" => result.OrderBy(p => p.StockQuantity).ToList(),
+                "stock_desc" => result.OrderByDescending(p => p.StockQuantity).ToList(),
+                _ => result.OrderBy(p => p.Name).ToList()
+            };
+
+            return result;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var savedCategories = await LocalStorage.GetItemAsync<List<string>>("categories");
+        if (savedCategories != null && savedCategories.Count > 0) categories = savedCategories;
+
+        newProduct.Category = categories.FirstOrDefault() ?? "";
+        await LoadProducts();
+    }
+
+    // --- PRODUCT METHODS ---
     private async Task SaveProduct()
     {
         using var client = new HttpClient();
-
-        // ⚠️ Make sure the port number matches your ProductService!
-        // (If your ProductService opens on 5200, keep this. Otherwise, change it).
-        var response = await client.PostAsJsonAsync("http://localhost:5200/api/products", newProduct);
+        var response = await client.PostAsJsonAsync("http://localhost:5233/api/products", newProduct);
 
         if (response.IsSuccessStatusCode)
         {
             Message = "Product added successfully!";
-            newProduct = new ProductModel(); // Clear the form
+            newProduct = new ProductModel { Category = categories.FirstOrDefault() ?? "" };
+            await LoadProducts();
         }
         else
         {
@@ -79,11 +254,94 @@
         }
     }
 
+    private async Task LoadProducts()
+    {
+        using var client = new HttpClient();
+        try
+        {
+            allProducts = await client.GetFromJsonAsync<List<ProductModel>>("http://localhost:5233/api/products");
+        }
+        catch { allProducts = new List<ProductModel>(); }
+    }
+
+    private void StartProductEdit(ProductModel p)
+    {
+        editingProductId = p.Id;
+        editProduct = new ProductModel
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Category = p.Category,
+            Description = p.Description,
+            Price = p.Price,
+            StockQuantity = p.StockQuantity,
+            ImageUrl = p.ImageUrl
+        };
+    }
+
+    private async Task SaveProductEdit()
+    {
+        using var client = new HttpClient();
+        var response = await client.PutAsJsonAsync($"http://localhost:5233/api/products/{editProduct.Id}", editProduct);
+
+        if (response.IsSuccessStatusCode)
+        {
+            editingProductId = null;
+            await LoadProducts();
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Failed to update product.");
+        }
+    }
+
+    private void CancelProductEdit() { editingProductId = null; }
+
+    private async Task DeleteProduct(int id)
+    {
+        bool confirm = await JSRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this product?");
+        if (!confirm) return;
+
+        using var client = new HttpClient();
+        var response = await client.DeleteAsync($"http://localhost:5233/api/products/{id}");
+
+        if (response.IsSuccessStatusCode) await LoadProducts();
+    }
+
+    // --- CATEGORY METHODS ---
+    private async Task AddCategory()
+    {
+        if (!string.IsNullOrWhiteSpace(newCategoryName) && !categories.Contains(newCategoryName))
+        {
+            categories.Add(newCategoryName);
+            await LocalStorage.SetItemAsync("categories", categories);
+            newCategoryName = "";
+        }
+    }
+
+    private void StartEditCategory(string cat) { editingCategory = cat; editCategoryName = cat; }
+    private async Task SaveEditCategory()
+    {
+        if (!string.IsNullOrWhiteSpace(editCategoryName) && editingCategory != null)
+        {
+            int index = categories.IndexOf(editingCategory);
+            if (index != -1) categories[index] = editCategoryName;
+            await LocalStorage.SetItemAsync("categories", categories);
+            editingCategory = null;
+        }
+    }
+    private void CancelEdit() { editingCategory = null; }
+    private async Task RemoveCategory(string cat)
+    {
+        categories.Remove(cat);
+        await LocalStorage.SetItemAsync("categories", categories);
+    }
+
     public class ProductModel
     {
         public int Id { get; set; }
         public string Name { get; set; } = "";
-        public string Category { get; set; } = "Brownies";
+        public string Category { get; set; } = "";
         public string Description { get; set; } = "";
         public decimal Price { get; set; }
         public string ImageUrl { get; set; } = "";

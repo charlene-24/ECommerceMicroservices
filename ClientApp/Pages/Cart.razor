@@ -1,6 +1,7 @@
 ﻿@page "/cart"
 @layout MainLayout
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Nav
 
 <h3 class="mb-4" style="color: #6b2a2a; font-family: 'Caveat', cursive; font-size: 3rem;">Your Cart</h3>
 
@@ -10,33 +11,49 @@
 }
 else if (cartItems.Count == 0)
 {
-    <p>Your cart is empty. <a href="/dashboard">Go back to the store!</a></p>
+    <div class="alert alert-info">
+        Your cart is empty. <a href="/products" class="fw-bold text-decoration-none" style="color: #c27c7c;">Go back to the store!</a>
+    </div>
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Item</th>
-                <th>Price</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in cartItems)
-            {
-                <tr>
-                    <td>@item.Name</td>
-                    <td>₱@item.Price.ToString("0.00")</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveItem(item)">Remove</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <div class="card shadow-sm border-0 mb-4" style="max-width: 800px;">
+        <div class="card-body p-4">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Price</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in cartItems)
+                    {
+                        <tr>
+                            <td class="fw-bold">@item.Name</td>
+                            <td style="color: #c27c7c;">₱@item.Price.ToString("0.00")</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveItem(item)">Remove</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
 
-    <h4 class="text-end">Total: ₱@cartItems.Sum(i => i.Price).ToString("0.00")</h4>
+            <hr />
+
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <h4 class="mb-0">Total:</h4>
+                <h3 class="mb-0" style="color: #6b2a2a; font-weight: bold;">₱@cartItems.Sum(i => i.Price).ToString("0.00")</h3>
+            </div>
+
+            <!-- The Checkout Button -->
+            <button class="btn w-100 text-white mt-4 py-3" @onclick="Checkout" style="background-color: #c27c7c; font-size: 1.2rem; border-radius: 10px;">
+                Proceed to Checkout
+            </button>
+        </div>
+    </div>
 }
 
 @code {
@@ -49,10 +66,17 @@ else
 
     private async Task RemoveItem(ProductModel item)
     {
-        cartItems.Remove(item);
-        await LocalStorage.SetItemAsync("cart", cartItems!);
+        cartItems?.Remove(item);
+        await LocalStorage.SetItemAsync("cart", cartItems);
     }
 
+    private void Checkout()
+    {
+        // Redirect to the Payment Sandbox page
+        Nav.NavigateTo("/checkout");
+    }
+
+    // 👇 THIS IS THE CLASS THAT WAS MISSING 👇
     public class ProductModel
     {
         public int Id { get; set; }

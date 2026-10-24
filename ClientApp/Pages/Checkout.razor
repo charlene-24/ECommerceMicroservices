@@ -1,0 +1,180 @@
+﻿@page "/checkout"
+@layout MainLayout
+@using System.Net.Http.Json
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
+
+<div class="container mt-4">
+    <h3 class="mb-4" style="color: #6b2a2a; font-family: 'Caveat', cursive; font-size: 3rem;">Secure Checkout</h3>
+
+    @if (cartItems == null || cartItems.Count == 0)
+    {
+        <div class="alert alert-info shadow-sm py-4 text-center">
+            <h5 class="mb-2">Your cart is empty!</h5>
+            <a href="/products" class="btn text-white px-4 mt-2" style="background-color: #c27c7c;">Browse Products</a>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <!-- Left Side: Shipping & Payment -->
+            <div class="col-md-7">
+                <div class="card shadow-sm border-0 p-4 mb-4">
+
+                    <!-- SHIPPING ADDRESS -->
+                    <h5 class="mb-3">1. Shipping Address</h5>
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" class="form-control" @bind="ShippingName" placeholder="Juan Dela Cruz">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Complete Address</label>
+                        <textarea class="form-control" @bind="ShippingAddress" rows="3" placeholder="House No, Street, Barangay, City"></textarea>
+                    </div>
+
+                    <hr class="my-4" />
+
+                    <!-- PAYMENT METHOD -->
+                    <h5 class="mb-3">2. Payment Method</h5>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Select Payment Method</label>
+                        <select class="form-select" @bind="selectedPayment">
+                            <option value="COD">Cash on Delivery (COD)</option>
+                            <option value="Online">Online Payment (Credit/Debit Card)</option>
+                        </select>
+                    </div>
+
+                    <!-- SHOW CARD FORM ONLY IF ONLINE IS SELECTED -->
+                    @if (selectedPayment == "Online")
+                    {
+                        <div class="card bg-light border-0 p-3 mb-4">
+                            <h6 class="mb-2">Card Details</h6>
+                            <div class="mb-2">
+                                <input type="text" class="form-control form-control-sm" @bind="CardName" placeholder="Name on Card">
+                            </div>
+                            <div class="mb-2">
+                                <input type="text" class="form-control form-control-sm" @bind="CardNumber" placeholder="Card Number" maxlength="19">
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm" @bind="Expiry" placeholder="MM/YY" maxlength="5">
+                                </div>
+                                <div class="col-6">
+                                    <input type="password" class="form-control form-control-sm" @bind="Cvv" placeholder="CVV" maxlength="4">
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <button class="btn w-100 text-white py-3" @onclick="ProcessPayment" style="background-color: #c27c7c; font-size: 1.1rem; border-radius: 10px;">
+                        Place Order (₱@cartItems.Sum(i => i.Price).ToString("0.00"))
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Side: Order Summary -->
+            <div class="col-md-5">
+                <div class="card shadow-sm border-0 p-4" style="background-color: #fcfaf8;">
+                    <h5 class="mb-3">Order Summary</h5>
+                    @foreach (var item in cartItems)
+                    {
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>@item.Name</span>
+                            <span>₱@item.Price.ToString("0.00")</span>
+                        </div>
+                    }
+                    <hr />
+                    <div class="d-flex justify-content-between fw-bold fs-5">
+                        <span>Total</span>
+                        <span style="color: #c27c7c;">₱@cartItems.Sum(i => i.Price).ToString("0.00")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ProductModel>? cartItems;
+
+    // Shipping Variables
+    private string ShippingName = "";
+    private string ShippingAddress = "";
+
+    // Payment Variables
+    private string selectedPayment = "COD"; // Default to COD
+    private string CardName = "";
+    private string CardNumber = "";
+    private string Expiry = "";
+    private string Cvv = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        cartItems = await LocalStorage.GetItemAsync<List<ProductModel>>("cart") ?? new List<ProductModel>();
+    }
+
+    // Helper method to change payment type safely
+    private void SelectPayment(string method)
+    {
+        selectedPayment = method;
+    }
+
+    private async Task ProcessPayment()
+    {
+        if (string.IsNullOrWhiteSpace(ShippingName) || string.IsNullOrWhiteSpace(ShippingAddress))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Please fill in your shipping address.");
+            return;
+        }
+
+        if (selectedPayment == "Online" && (string.IsNullOrWhiteSpace(CardName) || string.IsNullOrWhiteSpace(CardNumber)))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Please fill in your card details.");
+            return;
+        }
+
+        // Simulate network delay
+        await Task.Delay(1500);
+
+        var userName = await LocalStorage.GetItemAsync<string>("userName") ?? "Guest";
+
+        // Prepare order data
+        var orderData = new
+        {
+            UserName = userName,
+            TotalAmount = cartItems.Sum(i => i.Price),
+            ShippingAddress = $"{ShippingName} - {ShippingAddress}",
+            Items = cartItems.Select(i => new { ProductName = i.Id.ToString(), Quantity = 1, Price = i.Price }).ToList()
+        };
+
+        using var client = new HttpClient();
+        try
+        {
+            // ⚠️ Make sure this port matches your OrderService!
+            var response = await client.PostAsJsonAsync("http://localhost:5300/api/orders", orderData);
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LocalStorage.RemoveItemAsync("cart");
+                Nav.NavigateTo("/success");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Checkout failed. Could not save order.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Connection Error: {ex.Message}");
+        }
+    }
+
+    public class ProductModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public decimal Price { get; set; }
+    }
+}

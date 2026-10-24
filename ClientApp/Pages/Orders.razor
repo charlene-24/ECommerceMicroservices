@@ -1,0 +1,125 @@
+﻿@page "/admin/orders"
+@layout MainLayout
+@using System.Net.Http.Json
+@inject IJSRuntime JSRuntime
+
+<h3 class="mb-4" style="color: #6b2a2a; font-family: 'Caveat', cursive; font-size: 3rem;">Customer Orders</h3>
+
+@if (orders == null)
+{
+    <p>Loading orders...</p>
+}
+else if (orders.Count == 0)
+{
+    <div class="alert alert-info">No orders have been placed yet.</div>
+}
+else
+{
+    <div class="row">
+        @foreach (var order in orders)
+        {
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom-0 pt-3">
+                        <h5 class="mb-0">Order #@order.Id</h5>
+
+                        <!-- Status Badge -->
+                        @if (order.Status == "Completed")
+                        {
+                            <span class="badge bg-success">Completed</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-2">
+                            Customer: <strong>@order.UserName</strong> <br />
+                            Date: @order.OrderDate.ToString("MMM dd, yyyy h:mm tt") <br />
+                            <span style="color: #c27c7c;">📍 Ship to: @order.ShippingAddress</span>
+                        </p>
+                        <ul class="list-group list-group-flush mb-3">
+                            @foreach (var item in order.Items)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <span>@item.Quantity x @item.ProductName</span>
+                                    <span>₱@item.Price.ToString("0.00")</span>
+                                </li>
+                            }
+                        </ul>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Total: <span style="color: #c27c7c;">₱@order.TotalAmount.ToString("0.00")</span></h5>
+
+                            <!-- Checklist Button -->
+                            @if (order.Status == "Pending")
+                            {
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => MarkAsCompleted(order)">
+                                    ✔ Mark as Completed
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<OrderModel>? orders;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    private async Task LoadOrders()
+    {
+        using var client = new HttpClient();
+        try
+        {
+            // ⚠️ Make sure this port matches your OrderService!
+            orders = await client.GetFromJsonAsync<List<OrderModel>>("http://localhost:5054/api/orders");
+        }
+        catch
+        {
+            orders = new List<OrderModel>();
+        }
+    }
+
+    private async Task MarkAsCompleted(OrderModel order)
+    {
+        using var client = new HttpClient();
+        // ⚠️ Make sure this port matches your OrderService!
+        var response = await client.PutAsJsonAsync($"http://localhost:5054/api/orders/{order.Id}/status", "Completed");
+
+        if (response.IsSuccessStatusCode)
+        {
+            order.Status = "Completed"; // Update the UI instantly
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "Failed to update status.");
+        }
+    }
+
+    public class OrderModel
+    {
+        public int Id { get; set; }
+        public string UserName { get; set; } = "";
+        public decimal TotalAmount { get; set; }
+        public string ShippingAddress { get; set; } = "";
+        public DateTime OrderDate { get; set; }
+        public string Status { get; set; } = "";
+        public List<OrderItemModel> Items { get; set; } = new();
+    }
+
+    public class OrderItemModel
+    {
+        public string ProductName { get; set; } = "";
+        public int Quantity { get; set; }
+        public decimal Price { get; set; }
+    }
+}

@@ -1,0 +1,140 @@
+﻿@page "/products"
+@layout MainLayout
+@using System.Net.Http.Json
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
+
+<div class="container-fluid py-4" style="max-width: 1400px;">
+
+    <!-- Header & Filter -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 style="color: #1a1a1a; font-weight: 700; font-size: 1.8rem;">List of our products</h2>
+
+        <div class="d-flex gap-2">
+            <select class="form-select border-0 shadow-sm" @onchange="FilterCategory" style="background-color: #fcfaf8; width: 200px;">
+                <option value="All">All Categories</option>
+                @foreach (var cat in categories)
+                {
+                    <option value="@cat">@cat</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <!-- Error Message Box -->
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger shadow-sm">
+            <strong>⚠️ Backend Error:</strong> @errorMessage <br />
+            <small>Check if your ProductService is running and the port number is correct.</small>
+        </div>
+    }
+
+    <!-- Product Grid -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+        @if (products == null)
+        {
+            <div class="col"><p>Loading products...</p></div>
+        }
+        else if (products.Count == 0 && string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="col"><p>No products found in the database.</p></div>
+        }
+        else
+        {
+            @foreach (var product in FilteredProducts)
+            {
+                <div class="col">
+                    <div class="product-card card border-0 h-100 shadow-sm">
+                        <!-- Image container -->
+                        <div class="img-container" style="background-color: #f9f6f0; padding: 20px; border-radius: 12px 12px 0 0;">
+                            <img src="@product.ImageUrl" class="card-img-top" alt="@product.Name" style="height: 180px; object-fit: contain;">
+                        </div>
+
+                        <div class="card-body p-3 d-flex flex-column">
+                            <h6 class="card-title fw-bold mb-2" style="color: #333;">@product.Name</h6>
+
+                            <p class="card-text text-muted small mb-4" style="flex-grow: 1;">
+                                @product.Description
+                            </p>
+
+                            <!-- Simple Price and Button -->
+                            <div class="d-flex justify-content-between align-items-center mt-auto">
+                                <span class="fw-bold" style="color: #c27c7c; font-size: 1.2rem;">₱@product.Price.ToString("0.00")</span>
+
+                                <button class="btn btn-sm rounded-circle d-flex align-items-center justify-content-center"
+                                        @onclick="() => AddToCart(product)"
+                                        style="background-color: #c27c7c; color: white; width: 35px; height: 35px;">
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private List<ProductModel>? products;
+    private string selectedCategory = "All";
+    private string errorMessage = "";
+    private List<string> categories = new List<string>(); // <-- ADD THIS
+
+    private IEnumerable<ProductModel> FilteredProducts =>
+        selectedCategory == "All"
+            ? products ?? new List<ProductModel>()
+            : products?.Where(p => p.Category == selectedCategory) ?? new List<ProductModel>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1. Load Categories from LocalStorage
+        var savedCategories = await LocalStorage.GetItemAsync<List<string>>("categories");
+        if (savedCategories != null && savedCategories.Count > 0)
+        {
+            categories = savedCategories;
+        }
+        else
+        {
+            categories = new List<string> { "Brownies", "Crinkles", "Cookies", "Macaroons", "Revel Bars" };
+        }
+
+        // 2. Load Products
+        using var client = new HttpClient();
+        try
+        {
+            var response = await client.GetFromJsonAsync<List<ProductModel>>("http://localhost:5233/api/products");
+            products = response;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            products = new List<ProductModel>();
+        }
+    }
+
+    private void FilterCategory(ChangeEventArgs e)
+    {
+        selectedCategory = e.Value?.ToString() ?? "All";
+    }
+
+    private async Task AddToCart(ProductModel product)
+    {
+        var cart = await LocalStorage.GetItemAsync<List<ProductModel>>("cart") ?? new List<ProductModel>();
+        cart.Add(product);
+        await LocalStorage.SetItemAsync("cart", cart);
+        await JSRuntime.InvokeVoidAsync("alert", $"{product.Name} added to cart!");
+    }
+
+    public class ProductModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Description { get; set; } = "";
+        public decimal Price { get; set; }
+        public string ImageUrl { get; set; } = "";
+    }
+}

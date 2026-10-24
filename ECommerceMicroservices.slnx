@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="AuthService/AuthService.csproj" />
   <Project Path="ClientApp/ClientApp.csproj" />
+  <Project Path="OrderService/OrderService.csproj" Id="edee9c9d-0c62-4033-befc-fe3a0f0ca76a" />
   <Project Path="ProductService/ProductService.csproj" />
 </Solution>

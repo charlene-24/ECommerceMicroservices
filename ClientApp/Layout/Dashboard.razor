@@ -1,104 +1,18 @@
 ﻿@page "/dashboard"
-@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
-@inject IJSRuntime JSRuntime
 @layout MainLayout
-@using System.Net.Http.Json
 
-<h3 class="mb-4" style="color: #6b2a2a; font-family: 'Caveat', cursive; font-size: 3rem;">Our Sweet Treats</h3>
-<button class="btn btn-warning mb-3" @onclick="CheckMyRole">Check My Role</button>
+<div class="container mt-5 text-center">
+    <h1 style="color: #6b2a2a; font-family: 'Caveat', cursive; font-size: 4rem;">Welcome to Sweet Treats!</h1>
+    <p class="lead text-muted mb-5">Your daily dose of freshly baked happiness.</p>
 
-<!-- Category Filter -->
-<div class="mb-4">
-    <select class="form-select w-25" @onchange="FilterCategory">
-        <option value="All">All Categories</option>
-        <option value="Brownies">Brownies</option>
-        <option value="Crinkles">Crinkles</option>
-        <option value="Cookies">Cookies</option>
-        <option value="Macaroons">Macaroons</option>
-        <option value="Revel Bars">Revel Bars</option>
-    </select>
-</div>
-
-<div class="row">
-    @if (products == null)
-    {
-        <p>Loading products...</p>
-    }
-    else
-    {
-        @foreach (var product in FilteredProducts)
-        {
-            <div class="col-md-4 mb-4">
-                <div class="card h-100 shadow-sm border-0">
-                    <img src="@product.ImageUrl" class="card-img-top" alt="@product.Name" style="height: 200px; object-fit: cover;">
-                    <div class="card-body">
-                        <span class="badge mb-2" style="background-color: #d1bfae;">@product.Category</span>
-                        <h5 class="card-title">@product.Name</h5>
-                        <p class="card-text text-muted">@product.Description</p>
-                        <h4 style="color: #c27c7c;">₱@product.Price.ToString("0.00")</h4>
-                        <button class="btn w-100 text-white mt-3" @onclick="() => AddToCart(product)" style="background-color: #c27c7c;">
-                            Add to Cart
-                        </button>
-                    </div>
-                </div>
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 p-4" style="background-color: #fcfaf8;">
+                <h3 class="mb-3">Ready to order?</h3>
+                <a href="/products" class="btn btn-lg text-white w-100" style="background-color: #c27c7c;">
+                    Browse our Menu
+                </a>
             </div>
-        }
-    }
+        </div>
+    </div>
 </div>
-
-@code {
-    private List<ProductModel>? products;
-    private string selectedCategory = "All";
-
-
-    private async Task CheckMyRole()
-    {
-        var role = await LocalStorage.GetItemAsync<string>("userRole");
-        var name = await LocalStorage.GetItemAsync<string>("userName");
-
-        // This will pop up a window in your browser
-        await JSRuntime.InvokeVoidAsync("alert", $"Name: {name}, Role: {role}");
-    }
-
-
-    // This filters the list based on the dropdown
-    private IEnumerable<ProductModel> FilteredProducts =>
-        selectedCategory == "All"
-            ? products ?? new List<ProductModel>()
-            : products?.Where(p => p.Category == selectedCategory) ?? new List<ProductModel>();
-
-    protected override async Task OnInitializedAsync()
-    {
-        using var client = new HttpClient();
-        try
-        {
-            var response = await client.GetFromJsonAsync<List<ProductModel>>("http://localhost:5200/api/products");
-            products = response;
-        }
-        catch
-        {
-            products = new List<ProductModel>();
-        }
-    }
-
-    private void FilterCategory(ChangeEventArgs e)
-    {
-        selectedCategory = e.Value?.ToString() ?? "All";
-    }
-
-    private async Task AddToCart(ProductModel product)
-    {
-        // (Keep your existing AddToCart code here)
-        // Note: If you haven't added Blazored.LocalStorage yet, just leave a console log for now.
-    }
-
-    public class ProductModel
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = "";
-        public string Category { get; set; } = ""; // <-- ADD THIS LINE
-        public string Description { get; set; } = "";
-        public decimal Price { get; set; }
-        public string ImageUrl { get; set; } = "";
-    }
-}
